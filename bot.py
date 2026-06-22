@@ -5,7 +5,7 @@ import json
 import os
 import asyncio
 import time
-import urllib.request
+import requests
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -16,8 +16,15 @@ AUDIO_URL = "https://files.catbox.moe/bgnql2.wav"
 
 if not os.path.exists("audio.wav"):
     print("Downloading audio.wav...")
-    urllib.request.urlretrieve(AUDIO_URL, "audio.wav")
-    print("Download complete.")
+    try:
+        r = requests.get(AUDIO_URL, stream=True, timeout=120)
+        r.raise_for_status()
+        with open("audio.wav", "wb") as f:
+            for chunk in r.iter_content(chunk_size=8192):
+                f.write(chunk)
+        print("Download complete.")
+    except Exception as e:
+        print(f"Warning: Could not download audio.wav: {e}")
 
 GUILD_ID = 1446877712001138800
 VOICE_CHANNEL_ID = 1470723472513699924
