@@ -5,7 +5,9 @@ import json
 import os
 import asyncio
 import time
+import threading
 import requests
+from http.server import HTTPServer, BaseHTTPRequestHandler
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -355,5 +357,19 @@ async def rps(ctx, choice):
 @bot.command()
 async def roll(ctx):
     await ctx.send(f"You rolled {random.randint(1,6)}")
+
+class PingHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"SKYLINE is alive!")
+    def log_message(self, format, *args):
+        pass
+
+def run_server():
+    server = HTTPServer(("0.0.0.0", 8080), PingHandler)
+    server.serve_forever()
+
+threading.Thread(target=run_server, daemon=True).start()
 
 bot.run(TOKEN)
