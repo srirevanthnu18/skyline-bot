@@ -6,20 +6,69 @@ import os
 import asyncio
 import time
 import threading
+import io
+import tarfile
 import requests
+import imageio_ffmpeg
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from dotenv import load_dotenv
 
 load_dotenv()
 
 TOKEN = os.getenv("DISCORD_TOKEN")
-
-AUDIO_URL = "https://files.catbox.moe/bgnql2.wav"
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# --- ffmpeg (bundled via imageio-ffmpeg, no install needed) ---
+FFMPEG_PATH = imageio_ffmpeg.get_ffmpeg_exe()
+print(f"ffmpeg path: {FFMPEG_PATH}")
+
+# --- libopus (download from Ubuntu package without root) ---
+def extract_libopus(dest_path):
+    url = "http://archive.ubuntu.com/ubuntu/pool/main/o/opus/libopus0_1.3.1-0ubuntu1_amd64.deb"
+    print("Downloading libopus package...")
+    data = requests.get(url, timeout=60).content
+    pos = 8  # skip "!<arch>\n"
+    while pos < len(data):
+        name = data[pos:pos+16].decode(errors="ignore").strip()
+        size = int(data[pos+48:pos+58].decode(errors="ignore").strip())
+        content = data[pos+60:pos+60+size]
+        pos = pos + 60 + size + (size % 2)
+        if name.startswith("data.tar"):
+            with tarfile.open(fileobj=io.BytesIO(content)) as tar:
+                for member in tar.getmembers():
+                    if "libopus.so" in member.name and not member.islnk():
+                        f = tar.extractfile(member)
+                        if f:
+                            with open(dest_path, "wb") as out:
+                                out.write(f.read())
+                            print(f"libopus extracted to {dest_path}")
+                            return True
+    return False
+
+LIBOPUS_PATH = os.path.join(SCRIPT_DIR, "libopus.so.0")
+if not discord.opus.is_loaded():
+    for lib in ["libopus.so.0", "libopus.so", "libopus"]:
+        try:
+            discord.opus.load_opus(lib)
+            print(f"Loaded opus: {lib}")
+            break
+        except:
+            pass
+    if not discord.opus.is_loaded():
+        if not os.path.exists(LIBOPUS_PATH):
+            extract_libopus(LIBOPUS_PATH)
+        try:
+            discord.opus.load_opus(LIBOPUS_PATH)
+            print("Loaded bundled libopus")
+        except Exception as e:
+            print(f"WARNING: Could not load libopus: {e}")
+
+# --- audio file ---
+AUDIO_URL = "https://files.catbox.moe/bgnql2.wav"
 AUDIO_FILE = os.path.join(SCRIPT_DIR, "audio.wav")
 
 if not os.path.exists(AUDIO_FILE):
-    print(f"Downloading audio.wav to {AUDIO_FILE} ...")
+    print(f"Downloading audio.wav...")
     try:
         r = requests.get(AUDIO_URL, stream=True, timeout=180)
         r.raise_for_status()
@@ -30,17 +79,11 @@ if not os.path.exists(AUDIO_FILE):
     except Exception as e:
         print(f"ERROR: Could not download audio.wav: {e}")
 else:
-    print(f"audio.wav already exists ({os.path.getsize(AUDIO_FILE)} bytes)")
+    print(f"audio.wav exists ({os.path.getsize(AUDIO_FILE)} bytes)")
 
 GUILD_ID = 1446877712001138800
 VOICE_CHANNEL_ID = 1470723472513699924
 VC_TEXT_CHANNEL_ID = 1470723472513699924
-
-if not discord.opus.is_loaded():
-    try:
-        discord.opus.load_opus("libopus")
-    except:
-        discord.opus.load_opus("libopus.so.0")
 
 intents = discord.Intents.all()
 bot = commands.Bot(command_prefix="sky ", intents=intents, help_command=None)
@@ -108,7 +151,7 @@ async def play(interaction: discord.Interaction):
         if vc.is_playing():
             vc.stop()
 
-        source = discord.FFmpegPCMAudio(AUDIO_FILE, options="-ac 2")
+        source = discord.FFmpegPCMAudio(AUDIO_FILE, executable=FFMPEG_PATH, options="-ac 2")
         vc.play(discord.PCMVolumeTransformer(source, volume=1.0))
         print(f"Playing audio for {interaction.user}")
         await interaction.followup.send("🎵 Playing audio!")
@@ -147,7 +190,7 @@ async def on_voice_state_update(member, before, after):
             elif vc.channel != target_channel:
                 await vc.move_to(target_channel)
             if not vc.is_playing() and os.path.exists(AUDIO_FILE):
-                source = discord.FFmpegPCMAudio(AUDIO_FILE, options="-ac 2")
+                source = discord.FFmpegPCMAudio(AUDIO_FILE, executable=FFMPEG_PATH, options="-ac 2")
                 vc.play(discord.PCMVolumeTransformer(source, volume=1.0))
         except Exception as e:
             print(f"Auto-join/play error: {e}")
