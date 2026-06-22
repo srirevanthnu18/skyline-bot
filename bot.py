@@ -15,18 +15,22 @@ load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
 
 AUDIO_URL = "https://files.catbox.moe/bgnql2.wav"
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+AUDIO_FILE = os.path.join(SCRIPT_DIR, "audio.wav")
 
-if not os.path.exists("audio.wav"):
-    print("Downloading audio.wav...")
+if not os.path.exists(AUDIO_FILE):
+    print(f"Downloading audio.wav to {AUDIO_FILE} ...")
     try:
-        r = requests.get(AUDIO_URL, stream=True, timeout=120)
+        r = requests.get(AUDIO_URL, stream=True, timeout=180)
         r.raise_for_status()
-        with open("audio.wav", "wb") as f:
+        with open(AUDIO_FILE, "wb") as f:
             for chunk in r.iter_content(chunk_size=8192):
                 f.write(chunk)
-        print("Download complete.")
+        print(f"Download complete. Size: {os.path.getsize(AUDIO_FILE)} bytes")
     except Exception as e:
-        print(f"Warning: Could not download audio.wav: {e}")
+        print(f"ERROR: Could not download audio.wav: {e}")
+else:
+    print(f"audio.wav already exists ({os.path.getsize(AUDIO_FILE)} bytes)")
 
 GUILD_ID = 1446877712001138800
 VOICE_CHANNEL_ID = 1470723472513699924
@@ -56,8 +60,6 @@ def load_json(file):
 def save_json(file, data):
     with open(file, "w") as f:
         json.dump(data, f)
-
-AUDIO_FILE = "audio.wav"
 
 @bot.event
 async def on_ready():
