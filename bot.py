@@ -64,7 +64,7 @@ if not discord.opus.is_loaded():
             print(f"WARNING: Could not load libopus: {e}")
 
 # --- audio file ---
-AUDIO_URL = "https://files.catbox.moe/bgnql2.wav"
+AUDIO_URL = "https://github.com/srirevanthnu18/skyline-bot/releases/download/v1.0/audio.wav"
 AUDIO_FILE = os.path.join(SCRIPT_DIR, "audio.wav")
 
 if not os.path.exists(AUDIO_FILE):
