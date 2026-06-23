@@ -3,3 +3,8 @@ PyNaCl
 python-dotenv
 requests
 imageio-ffmpeg
+discord.py[voice]
+imageio-ffmpeg
+PyNaCl
+python-dotenv
+requests

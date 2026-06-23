@@ -402,7 +402,7 @@ class PingHandler(BaseHTTPRequestHandler):
         pass
 
 def run_server():
-    port = int(os.environ.get("PORT", 8080))
+    port = int(os.environ.get("PORT", 5000))
     server = HTTPServer(("0.0.0.0", port), PingHandler)
     print(f"Keepalive server on port {port}")
     server.serve_forever()
