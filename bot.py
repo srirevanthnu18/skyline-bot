@@ -17,6 +17,7 @@ load_dotenv()
 
 TOKEN = os.getenv("DISCORD_TOKEN")
 TOKEN_2 = os.getenv("DISCORD_TOKEN_2")
+TOKEN_3 = os.getenv("DISCORD_TOKEN_3")
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # --- ffmpeg (bundled via imageio-ffmpeg, no install needed) ---
@@ -409,16 +410,13 @@ threading.Thread(target=run_server, daemon=True).start()
 async def main():
     instances = []
     coros = []
-    if TOKEN:
-        b1 = make_bot("SKYLINE-1")
-        instances.append(b1)
-        coros.append(b1.start(TOKEN))
-    if TOKEN_2:
-        b2 = make_bot("SKYLINE-2")
-        instances.append(b2)
-        coros.append(b2.start(TOKEN_2))
+    for name, token in [("SKYLINE-1", TOKEN), ("SKYLINE-2", TOKEN_2), ("SKYLINE-3", TOKEN_3)]:
+        if token:
+            b = make_bot(name)
+            instances.append(b)
+            coros.append(b.start(token))
     if not coros:
-        print("ERROR: No tokens found. Set DISCORD_TOKEN and/or DISCORD_TOKEN_2.")
+        print("ERROR: No tokens found. Set DISCORD_TOKEN, DISCORD_TOKEN_2, or DISCORD_TOKEN_3.")
         return
     await asyncio.gather(*coros)
 
