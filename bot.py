@@ -81,9 +81,9 @@ if not os.path.exists(AUDIO_FILE):
 else:
     print(f"audio.wav exists ({os.path.getsize(AUDIO_FILE)} bytes)")
 
-GUILD_ID = int(os.getenv("GUILD_ID", "1446877712001138800"))
-VOICE_CHANNEL_ID = int(os.getenv("VOICE_CHANNEL_ID", "1470723472513699924"))
-VC_TEXT_CHANNEL_ID = int(os.getenv("VC_TEXT_CHANNEL_ID", "1470723472513699924"))
+GUILD_ID = 1446877712001138800
+VOICE_CHANNEL_ID = 1470723472513699924
+VC_TEXT_CHANNEL_ID = 1470723472513699924
 
 intents = discord.Intents.all()
 bot = commands.Bot(command_prefix="sky ", intents=intents, help_command=None)
