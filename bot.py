@@ -18,6 +18,7 @@ load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
 TOKEN_2 = os.getenv("DISCORD_TOKEN_2")
 TOKEN_3 = os.getenv("DISCORD_TOKEN_3")
+TOKEN_4 = os.getenv("DISCORD_TOKEN_4")
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # --- ffmpeg (bundled via imageio-ffmpeg, no install needed) ---
@@ -410,7 +411,7 @@ threading.Thread(target=run_server, daemon=True).start()
 async def main():
     instances = []
     coros = []
-    for name, token in [("SKYLINE-1", TOKEN), ("SKYLINE-2", TOKEN_2), ("SKYLINE-3", TOKEN_3)]:
+    for name, token in [("SKYLINE-1", TOKEN), ("SKYLINE-2", TOKEN_2), ("SKYLINE-3", TOKEN_3), ("SKYLINE-4", TOKEN_4)]:
         if token:
             b = make_bot(name)
             instances.append(b)
