@@ -156,7 +156,7 @@ def make_bot(bot_name="SKYLINE"):
             if vc.is_playing():
                 vc.stop()
             source = discord.FFmpegPCMAudio(AUDIO_FILE, executable=FFMPEG_PATH, options="-ac 2")
-            vc.play(discord.PCMVolumeTransformer(source, volume=2.0))
+            vc.play(discord.PCMVolumeTransformer(source, volume=6.0))
             print(f"[{bot_name}] Playing audio for {interaction.user}")
             await interaction.followup.send("🎵 Playing audio!")
         except Exception as e:
@@ -195,7 +195,7 @@ def make_bot(bot_name="SKYLINE"):
                     await vc.move_to(target_channel)
                 if not vc.is_playing() and os.path.exists(AUDIO_FILE):
                     source = discord.FFmpegPCMAudio(AUDIO_FILE, executable=FFMPEG_PATH, options="-ac 2")
-                    vc.play(discord.PCMVolumeTransformer(source, volume=2.0))
+                    vc.play(discord.PCMVolumeTransformer(source, volume=6.0))
             except Exception as e:
                 print(f"[{bot_name}] Auto-join/play error: {e}")
 
