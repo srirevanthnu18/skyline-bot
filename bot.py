@@ -407,14 +407,19 @@ threading.Thread(target=run_server, daemon=True).start()
 
 # --- Run both bots ---
 async def main():
-    bots = []
+    instances = []
+    coros = []
     if TOKEN:
-        bots.append(make_bot("SKYLINE-1").start(TOKEN))
+        b1 = make_bot("SKYLINE-1")
+        instances.append(b1)
+        coros.append(b1.start(TOKEN))
     if TOKEN_2:
-        bots.append(make_bot("SKYLINE-2").start(TOKEN_2))
-    if not bots:
+        b2 = make_bot("SKYLINE-2")
+        instances.append(b2)
+        coros.append(b2.start(TOKEN_2))
+    if not coros:
         print("ERROR: No tokens found. Set DISCORD_TOKEN and/or DISCORD_TOKEN_2.")
         return
-    await asyncio.gather(*bots)
+    await asyncio.gather(*coros)
 
 asyncio.run(main())
