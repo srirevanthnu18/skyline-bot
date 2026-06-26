@@ -152,9 +152,13 @@ def make_bot(bot_name="SKYLINE"):
             if vc is None:
                 if interaction.user.voice:
                     vc = await interaction.user.voice.channel.connect()
+                    await asyncio.sleep(1)
                 else:
                     await interaction.followup.send("❌ Join a voice channel first or I need to already be in one!")
                     return
+            if not vc.is_connected():
+                await interaction.followup.send("❌ Not connected to voice. Try again in a moment.")
+                return
             if vc.is_playing():
                 vc.stop()
             source = discord.FFmpegPCMAudio(AUDIO_FILE, executable=FFMPEG_PATH, options="-ac 2")
@@ -193,9 +197,11 @@ def make_bot(bot_name="SKYLINE"):
             try:
                 if vc is None:
                     vc = await target_channel.connect()
+                    await asyncio.sleep(1)
                 elif vc.channel != target_channel:
                     await vc.move_to(target_channel)
-                if not vc.is_playing() and os.path.exists(AUDIO_FILE):
+                    await asyncio.sleep(1)
+                if vc.is_connected() and not vc.is_playing() and os.path.exists(AUDIO_FILE):
                     source = discord.FFmpegPCMAudio(AUDIO_FILE, executable=FFMPEG_PATH, options="-ac 2")
                     vc.play(discord.PCMVolumeTransformer(source, volume=2.0))
             except Exception as e:
