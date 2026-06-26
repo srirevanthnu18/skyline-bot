@@ -120,6 +120,13 @@ def make_bot(bot_name="SKYLINE"):
     @bot.event
     async def on_ready():
         print(f"{bot_name} Online as {bot.user} in {len(bot.guilds)} server(s)")
+        # Global sync — makes user-installed commands work in DMs and any server
+        try:
+            await bot.tree.sync()
+            print(f"[{bot_name}] Global slash commands synced")
+        except Exception as e:
+            print(f"[{bot_name}] Global sync error: {e}")
+        # Per-guild sync for instant availability
         for guild in bot.guilds:
             try:
                 bot.tree.copy_global_to(guild=guild)
@@ -140,6 +147,25 @@ def make_bot(bot_name="SKYLINE"):
         else:
             await vc.move_to(channel)
         await ctx.send(f"✅ Joined **{channel.name}**!")
+
+    @bot.tree.command(name="skyjoin", description="Make the bot join your current voice channel")
+    @discord.app_commands.allowed_installs(guilds=True, users=True)
+    @discord.app_commands.allowed_contexts(guilds=True, dms=False, private_channels=False)
+    async def skyjoin(interaction: discord.Interaction):
+        if not interaction.user.voice or not interaction.user.voice.channel:
+            await interaction.response.send_message("❌ You need to be in a voice channel first!", ephemeral=True)
+            return
+        await interaction.response.defer(ephemeral=True)
+        target_channel = interaction.user.voice.channel
+        vc = interaction.guild.voice_client
+        try:
+            if vc is None:
+                await target_channel.connect()
+            else:
+                await vc.move_to(target_channel)
+            await interaction.followup.send(f"✅ Joined **{target_channel.name}**!", ephemeral=True)
+        except Exception as e:
+            await interaction.followup.send(f"❌ Error: `{e}`", ephemeral=True)
 
     @bot.tree.command(name="skyplay", description="Play the default audio in the voice channel")
     async def play(interaction: discord.Interaction):
@@ -293,6 +319,8 @@ def make_bot(bot_name="SKYLINE"):
 
     @bot.tree.command(name="skytype", description="Send a message multiple times")
     @discord.app_commands.describe(message="The message to send", times="How many times to send it")
+    @discord.app_commands.allowed_installs(guilds=True, users=True)
+    @discord.app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
     async def skytype(interaction: discord.Interaction, message: str, times: int):
         if times < 1:
             await interaction.response.send_message("❌ Times must be at least 1.", ephemeral=True)
