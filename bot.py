@@ -327,7 +327,7 @@ def make_bot(bot_name="SKYLINE"):
             return
         await interaction.response.send_message(f"✅ Sending your message {times} time(s)!", ephemeral=True)
         for _ in range(times):
-            await interaction.channel.send(message)
+            await interaction.followup.send(message)
             await asyncio.sleep(0.5)
 
     @bot.command()
