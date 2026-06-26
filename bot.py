@@ -89,6 +89,11 @@ else:
     print(f"audio.wav exists ({os.path.getsize(AUDIO_FILE)} bytes)")
 
 
+# --- Hardcoded server & voice channel ---
+GUILD_ID = 1446877712001138800
+VOICE_CHANNEL_ID = 1470723472513699924
+VC_TEXT_CHANNEL_ID = 1470723472513699924
+
 if not os.path.exists("levels.json"):
     with open("levels.json", "w") as f:
         json.dump({}, f)
@@ -133,6 +138,16 @@ def make_bot(bot_name="SKYLINE"):
                 await bot.tree.sync(guild=guild)
             except Exception as e:
                 print(f"[{bot_name}] Sync error in {guild.name}: {e}")
+        # Auto-join hardcoded voice channel on startup
+        guild = bot.get_guild(GUILD_ID)
+        if guild:
+            channel = guild.get_channel(VOICE_CHANNEL_ID)
+            if channel and guild.voice_client is None:
+                try:
+                    await channel.connect()
+                    print(f"[{bot_name}] Auto-joined {channel.name}")
+                except Exception as e:
+                    print(f"[{bot_name}] Auto-join error: {e}")
 
     @bot.command()
     @commands.has_permissions(administrator=True)
@@ -194,22 +209,33 @@ def make_bot(bot_name="SKYLINE"):
 
     @bot.event
     async def on_voice_state_update(member, before, after):
+        # If it's this bot being disconnected — rejoin hardcoded VC
         if member.bot:
+            if member.id == bot.user.id and after.channel is None:
+                await asyncio.sleep(5)
+                guild = bot.get_guild(GUILD_ID)
+                if guild:
+                    channel = guild.get_channel(VOICE_CHANNEL_ID)
+                    if channel:
+                        try:
+                            await channel.connect()
+                        except Exception as e:
+                            print(f"[{bot_name}] Reconnect error: {e}")
             return
 
-        guild = member.guild
-        # Use system channel for join/leave messages, fallback to first text channel
-        text_channel = guild.system_channel or next(
-            (c for c in guild.text_channels if c.permissions_for(guild.me).send_messages), None
-        )
+        # Only react to events in the hardcoded guild
+        if member.guild.id != GUILD_ID:
+            return
+
+        guild = bot.get_guild(GUILD_ID)
+        text_channel = guild.get_channel(VC_TEXT_CHANNEL_ID) if guild else None
 
         joined_vc = before.channel is None and after.channel is not None
         switched_vc = before.channel is not None and after.channel is not None and before.channel != after.channel
         left_vc = before.channel is not None and after.channel is None
 
-        if joined_vc:
-            if text_channel:
-                await text_channel.send(f"vakkam da mama! 🔥 {member.mention}")
+        if joined_vc and text_channel:
+            await text_channel.send(f"vakkam da mama! 🔥 {member.mention}")
 
         if joined_vc or switched_vc:
             await asyncio.sleep(stagger_delay)
@@ -230,7 +256,7 @@ def make_bot(bot_name="SKYLINE"):
                 if vc.is_connected() and not vc.is_playing() and os.path.exists(AUDIO_FILE):
                     source = discord.FFmpegPCMAudio(AUDIO_FILE, executable=FFMPEG_PATH, options="-ac 2")
                     vc.play(discord.PCMVolumeTransformer(source, volume=2.0))
-                    print(f"[{bot_name}] Playing audio in {target_channel.name} ({guild.name})")
+                    print(f"[{bot_name}] Playing audio in {target_channel.name}")
                 else:
                     print(f"[{bot_name}] Skipped play: connected={vc.is_connected() if vc else False}")
             except Exception as e:
