@@ -362,7 +362,7 @@ def make_bot(bot_name="SKYLINE"):
                     await interaction.followup.send(message)
             except Exception as e:
                 print(f"[{bot_name}] skytype send error: {e}")
-            await asyncio.sleep(0.75)
+            await asyncio.sleep(2)
 
     @bot.command()
     async def help(ctx):
