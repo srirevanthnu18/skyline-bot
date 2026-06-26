@@ -289,10 +289,10 @@ def make_bot(bot_name="SKYLINE"):
             pass
 
     @bot.tree.command(name="skytype", description="Send a message multiple times")
-    @discord.app_commands.describe(message="The message to send", times="How many times to send it (max 20)")
+    @discord.app_commands.describe(message="The message to send", times="How many times to send it")
     async def skytype(interaction: discord.Interaction, message: str, times: int):
-        if times < 1 or times > 20:
-            await interaction.response.send_message("❌ Times must be between 1 and 20.", ephemeral=True)
+        if times < 1:
+            await interaction.response.send_message("❌ Times must be at least 1.", ephemeral=True)
             return
         await interaction.response.send_message(f"✅ Sending your message {times} time(s)!", ephemeral=True)
         for _ in range(times):
