@@ -88,9 +88,6 @@ if not os.path.exists(AUDIO_FILE):
 else:
     print(f"audio.wav exists ({os.path.getsize(AUDIO_FILE)} bytes)")
 
-GUILD_ID = 1446877712001138800
-VOICE_CHANNEL_ID = 1470723472513699924
-VC_TEXT_CHANNEL_ID = 1470723472513699924
 
 if not os.path.exists("levels.json"):
     with open("levels.json", "w") as f:
@@ -122,19 +119,13 @@ def make_bot(bot_name="SKYLINE"):
 
     @bot.event
     async def on_ready():
-        print(f"{bot_name} Online as {bot.user}")
-        guild_obj = discord.Object(id=GUILD_ID)
-        bot.tree.copy_global_to(guild=guild_obj)
-        await bot.tree.sync(guild=guild_obj)
-        guild = bot.get_guild(GUILD_ID)
-        if guild:
-            channel = guild.get_channel(VOICE_CHANNEL_ID)
-            if channel:
-                try:
-                    if guild.voice_client is None:
-                        await channel.connect()
-                except:
-                    pass
+        print(f"{bot_name} Online as {bot.user} in {len(bot.guilds)} server(s)")
+        for guild in bot.guilds:
+            try:
+                bot.tree.copy_global_to(guild=guild)
+                await bot.tree.sync(guild=guild)
+            except Exception as e:
+                print(f"[{bot_name}] Sync error in {guild.name}: {e}")
 
     @bot.command()
     @commands.has_permissions(administrator=True)
@@ -178,16 +169,13 @@ def make_bot(bot_name="SKYLINE"):
     @bot.event
     async def on_voice_state_update(member, before, after):
         if member.bot:
-            if member.id == bot.user.id and after.channel is None:
-                await asyncio.sleep(5)
-                guild = bot.get_guild(GUILD_ID)
-                channel = guild.get_channel(VOICE_CHANNEL_ID)
-                if channel:
-                    await channel.connect()
             return
 
-        guild = bot.get_guild(GUILD_ID)
-        text_channel = guild.get_channel(VC_TEXT_CHANNEL_ID) if guild else None
+        guild = member.guild
+        # Use system channel for join/leave messages, fallback to first text channel
+        text_channel = guild.system_channel or next(
+            (c for c in guild.text_channels if c.permissions_for(guild.me).send_messages), None
+        )
 
         joined_vc = before.channel is None and after.channel is not None
         switched_vc = before.channel is not None and after.channel is not None and before.channel != after.channel
@@ -199,7 +187,7 @@ def make_bot(bot_name="SKYLINE"):
 
         if joined_vc or switched_vc:
             await asyncio.sleep(stagger_delay)
-            vc = member.guild.voice_client
+            vc = guild.voice_client
             target_channel = after.channel
             try:
                 if vc is None:
@@ -216,7 +204,7 @@ def make_bot(bot_name="SKYLINE"):
                 if vc.is_connected() and not vc.is_playing() and os.path.exists(AUDIO_FILE):
                     source = discord.FFmpegPCMAudio(AUDIO_FILE, executable=FFMPEG_PATH, options="-ac 2")
                     vc.play(discord.PCMVolumeTransformer(source, volume=2.0))
-                    print(f"[{bot_name}] Playing audio in {target_channel.name}")
+                    print(f"[{bot_name}] Playing audio in {target_channel.name} ({guild.name})")
                 else:
                     print(f"[{bot_name}] Skipped play: connected={vc.is_connected() if vc else False}")
             except Exception as e:
