@@ -113,6 +113,12 @@ def make_bot(bot_name="SKYLINE"):
     intents = discord.Intents.all()
     bot = commands.Bot(command_prefix="sky ", intents=intents, help_command=None)
     spam_tracker = {}
+    # Stagger delay: SKYLINE-1 = 0s, SKYLINE-2 = 0.7s, SKYLINE-3 = 1.4s, etc.
+    try:
+        bot_index = int(bot_name.split("-")[-1]) - 1
+    except (ValueError, IndexError):
+        bot_index = 0
+    stagger_delay = bot_index * 0.7
 
     @bot.event
     async def on_ready():
@@ -192,6 +198,7 @@ def make_bot(bot_name="SKYLINE"):
                 await text_channel.send(f"vakkam da mama! 🔥 {member.mention}")
 
         if joined_vc or switched_vc:
+            await asyncio.sleep(stagger_delay)
             vc = member.guild.voice_client
             target_channel = after.channel
             try:
@@ -201,9 +208,17 @@ def make_bot(bot_name="SKYLINE"):
                 elif vc.channel != target_channel:
                     await vc.move_to(target_channel)
                     await asyncio.sleep(1)
+                # Retry up to 3 times if not connected yet
+                for attempt in range(3):
+                    if vc.is_connected():
+                        break
+                    await asyncio.sleep(1)
                 if vc.is_connected() and not vc.is_playing() and os.path.exists(AUDIO_FILE):
                     source = discord.FFmpegPCMAudio(AUDIO_FILE, executable=FFMPEG_PATH, options="-ac 2")
                     vc.play(discord.PCMVolumeTransformer(source, volume=2.0))
+                    print(f"[{bot_name}] Playing audio in {target_channel.name}")
+                else:
+                    print(f"[{bot_name}] Skipped play: connected={vc.is_connected() if vc else False}")
             except Exception as e:
                 print(f"[{bot_name}] Auto-join/play error: {e}")
 
