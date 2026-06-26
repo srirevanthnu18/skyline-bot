@@ -352,9 +352,17 @@ def make_bot(bot_name="SKYLINE"):
             await interaction.response.send_message("❌ Times must be at least 1.", ephemeral=True)
             return
         await interaction.response.send_message(f"✅ Sending your message {times} time(s)!", ephemeral=True)
+        # Use channel.send() in guilds (no cap) — fallback to followup for DMs
+        use_channel = interaction.channel is not None and interaction.guild is not None
         for _ in range(times):
-            await interaction.followup.send(message)
-            await asyncio.sleep(0.5)
+            try:
+                if use_channel:
+                    await interaction.channel.send(message)
+                else:
+                    await interaction.followup.send(message)
+            except Exception as e:
+                print(f"[{bot_name}] skytype send error: {e}")
+            await asyncio.sleep(0.75)
 
     @bot.command()
     async def help(ctx):
