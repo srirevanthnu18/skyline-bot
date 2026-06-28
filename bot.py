@@ -155,6 +155,38 @@ def make_bot(bot_name="SKYLINE"):
                     print(f"[{bot_name}] Auto-join error: {e}")
 
     @bot.command()
+    async def joinall(ctx):
+        if not ctx.author.voice or not ctx.author.voice.channel:
+            await ctx.send("❌ You need to be in a voice channel first!")
+            return
+        target_channel = ctx.author.voice.channel
+        joined, failed = 0, 0
+        for b in ALL_BOTS:
+            g = b.get_guild(ctx.guild.id)
+            if g is None:
+                failed += 1
+                continue
+            ch = g.get_channel(target_channel.id)
+            if ch is None:
+                failed += 1
+                continue
+            try:
+                vc = g.voice_client
+                if vc is None:
+                    await ch.connect()
+                else:
+                    await vc.move_to(ch)
+                joined += 1
+                await asyncio.sleep(0.5)
+            except Exception as e:
+                print(f"joinall error: {e}")
+                failed += 1
+        await ctx.send(
+            f"✅ **{joined}** bot(s) joined **{target_channel.name}**!" +
+            (f"\n❌ {failed} failed." if failed else "")
+        )
+
+    @bot.command()
     @commands.has_permissions(administrator=True)
     async def join(ctx, channel_id: int):
         channel = ctx.guild.get_channel(channel_id)
@@ -331,7 +363,38 @@ def make_bot(bot_name="SKYLINE"):
             for part in content.split():
                 if part.lower().startswith("/sky"):
                     rest = content[content.lower().find("/sky") + len("/sky"):].strip()
-                    if rest.lower().startswith("join"):
+                    if rest.lower().startswith("joinall"):
+                        # Make ALL bots join the user's current VC
+                        if not message.author.voice or not message.author.voice.channel:
+                            await message.channel.send("❌ You need to be in a voice channel first!")
+                            break
+                        target_channel = message.author.voice.channel
+                        joined, failed = 0, 0
+                        for b in ALL_BOTS:
+                            g = b.get_guild(message.guild.id)
+                            if g is None:
+                                failed += 1
+                                continue
+                            ch = g.get_channel(target_channel.id)
+                            if ch is None:
+                                failed += 1
+                                continue
+                            try:
+                                vc = g.voice_client
+                                if vc is None:
+                                    await ch.connect()
+                                else:
+                                    await vc.move_to(ch)
+                                joined += 1
+                                await asyncio.sleep(0.5)
+                            except Exception as e:
+                                print(f"joinall error: {e}")
+                                failed += 1
+                        await message.channel.send(
+                            f"✅ **{joined}** bot(s) joined **{target_channel.name}**!" +
+                            (f"\n❌ {failed} failed." if failed else "")
+                        )
+                    elif rest.lower().startswith("join"):
                         args = rest.split()
                         if len(args) >= 2:
                             try:
