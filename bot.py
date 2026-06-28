@@ -110,6 +110,9 @@ def save_json(file, data):
     with open(file, "w") as f:
         json.dump(data, f)
 
+# --- Shared list of all running bot instances ---
+ALL_BOTS = []
+
 # --- Bot factory ---
 def make_bot(bot_name="SKYLINE"):
     intents = discord.Intents.all()
@@ -124,6 +127,8 @@ def make_bot(bot_name="SKYLINE"):
 
     @bot.event
     async def on_ready():
+        if bot not in ALL_BOTS:
+            ALL_BOTS.append(bot)
         print(f"{bot_name} Online as {bot.user} in {len(bot.guilds)} server(s)")
         # Global sync — makes user-installed commands work in DMs and any server
         try:
@@ -181,6 +186,57 @@ def make_bot(bot_name="SKYLINE"):
             await interaction.followup.send(f"✅ Joined **{target_channel.name}**!", ephemeral=True)
         except Exception as e:
             await interaction.followup.send(f"❌ Error: `{e}`", ephemeral=True)
+
+    @bot.tree.command(name="skyjoinall", description="Make ALL bots join a voice channel")
+    @discord.app_commands.describe(channel_id="Voice channel ID to join (leave empty to use your current VC)")
+    @discord.app_commands.allowed_installs(guilds=True, users=True)
+    @discord.app_commands.allowed_contexts(guilds=True, dms=False, private_channels=False)
+    async def skyjoinall(interaction: discord.Interaction, channel_id: str = None):
+        await interaction.response.defer(ephemeral=True)
+        # Resolve target channel
+        if channel_id:
+            try:
+                target_channel = interaction.guild.get_channel(int(channel_id))
+            except ValueError:
+                await interaction.followup.send("❌ Invalid channel ID.", ephemeral=True)
+                return
+        elif interaction.user.voice and interaction.user.voice.channel:
+            target_channel = interaction.user.voice.channel
+        else:
+            await interaction.followup.send("❌ Join a voice channel first or provide a channel ID.", ephemeral=True)
+            return
+
+        if not isinstance(target_channel, discord.VoiceChannel):
+            await interaction.followup.send("❌ That's not a voice channel.", ephemeral=True)
+            return
+
+        joined, failed = 0, 0
+        for b in ALL_BOTS:
+            guild = b.get_guild(interaction.guild.id)
+            if guild is None:
+                failed += 1
+                continue
+            ch = guild.get_channel(target_channel.id)
+            if ch is None:
+                failed += 1
+                continue
+            try:
+                vc = guild.voice_client
+                if vc is None:
+                    await ch.connect()
+                else:
+                    await vc.move_to(ch)
+                joined += 1
+                await asyncio.sleep(0.5)
+            except Exception as e:
+                print(f"skyjoinall error for {b.user}: {e}")
+                failed += 1
+
+        await interaction.followup.send(
+            f"✅ **{joined}** bot(s) joined **{target_channel.name}**!" +
+            (f"\n❌ {failed} bot(s) failed." if failed else ""),
+            ephemeral=True
+        )
 
     @bot.tree.command(name="skyplay", description="Play the default audio in the voice channel")
     async def play(interaction: discord.Interaction):
