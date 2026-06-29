@@ -137,6 +137,7 @@ async def _resolve_member(guild, query):
 
 async def _send_loop(guild_id, target_id, message_text, status_channel):
     count = 0
+    last_status = asyncio.get_event_loop().time()
     try:
         while True:
             async def _dm(b):
@@ -153,6 +154,14 @@ async def _send_loop(guild_id, target_id, message_text, status_channel):
             sent = sum(1 for r in results if r)
             count += sent
             SEND_TASKS[guild_id]["count"] = count
+            now = asyncio.get_event_loop().time()
+            if now - last_status >= 5:
+                try:
+                    target_name = SEND_TASKS[guild_id].get("target", "user")
+                    await status_channel.send(f"📨 **{count}** messages sent to **{target_name}** so far...")
+                except Exception:
+                    pass
+                last_status = now
             await asyncio.sleep(0.1)
     except asyncio.CancelledError:
         try:
