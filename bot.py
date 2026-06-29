@@ -247,6 +247,7 @@ def make_bot(bot_name="SKYLINE"):
         )
 
     @bot.command(name="send")
+    @commands.has_permissions(administrator=True)
     async def sky_send(ctx, target: str = None, *, message_text: str = None):
         if not target or not message_text:
             await ctx.send("❌ Usage: `sky send @user <message>`")
@@ -265,6 +266,7 @@ def make_bot(bot_name="SKYLINE"):
         SEND_TASKS[ctx.guild.id] = {"task": task, "count": 0, "target": member.display_name}
 
     @bot.command(name="stop")
+    @commands.has_permissions(administrator=True)
     async def sky_stop(ctx):
         entry = SEND_TASKS.pop(ctx.guild.id, None)
         if entry is None:
@@ -435,8 +437,10 @@ def make_bot(bot_name="SKYLINE"):
                 if part.lower().startswith("/sky"):
                     rest = content[content.lower().find("/sky") + len("/sky"):].strip()
                     if rest.lower().startswith("send"):
+                        if not message.author.guild_permissions.administrator:
+                            await message.channel.send("❌ Only admins can use this command.")
+                            break
                         args = rest.split(None, 2)
-                        # args[0]="send", args[1]=target, args[2]=message
                         if len(args) < 3:
                             await message.channel.send("❌ Usage: `@bot /skysend @user <message>`")
                             break
@@ -455,6 +459,9 @@ def make_bot(bot_name="SKYLINE"):
                         )
                         SEND_TASKS[message.guild.id] = {"task": task, "count": 0, "target": member.display_name}
                     elif rest.lower().startswith("stop"):
+                        if not message.author.guild_permissions.administrator:
+                            await message.channel.send("❌ Only admins can use this command.")
+                            break
                         entry = SEND_TASKS.pop(message.guild.id, None)
                         if entry is None:
                             await message.channel.send("❌ Nothing is currently sending.")
