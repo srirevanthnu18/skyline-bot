@@ -113,6 +113,53 @@ def save_json(file, data):
 # --- Shared list of all running bot instances ---
 ALL_BOTS = []
 
+# --- Active DM send tasks: guild_id -> {task, count, target_name} ---
+SEND_TASKS = {}
+
+async def _resolve_member(guild, query):
+    query = query.strip()
+    # Mention format <@123456>
+    if query.startswith("<@") and query.endswith(">"):
+        uid = int(query.replace("<@", "").replace("!", "").replace(">", ""))
+        return guild.get_member(uid)
+    # Plain ID
+    if query.isdigit():
+        return guild.get_member(int(query))
+    # Name search
+    q = query.lower()
+    for m in guild.members:
+        if m.name.lower() == q or m.display_name.lower() == q:
+            return m
+    for m in guild.members:
+        if q in m.name.lower() or q in m.display_name.lower():
+            return m
+    return None
+
+async def _send_loop(guild_id, target_id, message_text, status_channel):
+    count = 0
+    try:
+        while True:
+            async def _dm(b):
+                try:
+                    for g in b.guilds:
+                        m = g.get_member(target_id)
+                        if m:
+                            await m.send(message_text)
+                            return True
+                    return False
+                except Exception:
+                    return False
+            results = await asyncio.gather(*[_dm(b) for b in ALL_BOTS])
+            sent = sum(1 for r in results if r)
+            count += sent
+            SEND_TASKS[guild_id]["count"] = count
+            await asyncio.sleep(0.1)
+    except asyncio.CancelledError:
+        try:
+            await status_channel.send(f"🛑 Stopped! Total **{count}** messages sent.")
+        except Exception:
+            pass
+
 async def _joinall_fast(guild_id, channel_id):
     async def _do_join(b):
         try:
@@ -189,6 +236,32 @@ def make_bot(bot_name="SKYLINE"):
             f"✅ **{joined}** bot(s) joined **{target_channel.name}**!" +
             (f"\n❌ {failed} failed." if failed else "")
         )
+
+    @bot.command(name="send")
+    async def sky_send(ctx, target: str = None, *, message_text: str = None):
+        if not target or not message_text:
+            await ctx.send("❌ Usage: `sky send @user <message>`")
+            return
+        if ctx.guild.id in SEND_TASKS:
+            await ctx.send("⚠️ Already sending! Use `sky stop` first.")
+            return
+        member = await _resolve_member(ctx.guild, target)
+        if member is None:
+            await ctx.send(f"❌ User `{target}` not found in this server.")
+            return
+        await ctx.send(f"🚀 All bots are now DMing **{member.display_name}** | Use `sky stop` to stop.")
+        task = asyncio.get_event_loop().create_task(
+            _send_loop(ctx.guild.id, member.id, message_text, ctx.channel)
+        )
+        SEND_TASKS[ctx.guild.id] = {"task": task, "count": 0, "target": member.display_name}
+
+    @bot.command(name="stop")
+    async def sky_stop(ctx):
+        entry = SEND_TASKS.pop(ctx.guild.id, None)
+        if entry is None:
+            await ctx.send("❌ Nothing is currently sending.")
+            return
+        entry["task"].cancel()
 
     @bot.command()
     @commands.has_permissions(administrator=True)
@@ -352,7 +425,33 @@ def make_bot(bot_name="SKYLINE"):
             for part in content.split():
                 if part.lower().startswith("/sky"):
                     rest = content[content.lower().find("/sky") + len("/sky"):].strip()
-                    if rest.lower().startswith("joinall"):
+                    if rest.lower().startswith("send"):
+                        args = rest.split(None, 2)
+                        # args[0]="send", args[1]=target, args[2]=message
+                        if len(args) < 3:
+                            await message.channel.send("❌ Usage: `@bot /skysend @user <message>`")
+                            break
+                        target_q = args[1]
+                        msg_text = args[2]
+                        if message.guild.id in SEND_TASKS:
+                            await message.channel.send("⚠️ Already sending! Use `@bot /skystop` first.")
+                            break
+                        member = await _resolve_member(message.guild, target_q)
+                        if member is None:
+                            await message.channel.send(f"❌ User `{target_q}` not found.")
+                            break
+                        await message.channel.send(f"🚀 All bots are DMing **{member.display_name}** | Say `@bot /skystop` to stop.")
+                        task = asyncio.get_event_loop().create_task(
+                            _send_loop(message.guild.id, member.id, msg_text, message.channel)
+                        )
+                        SEND_TASKS[message.guild.id] = {"task": task, "count": 0, "target": member.display_name}
+                    elif rest.lower().startswith("stop"):
+                        entry = SEND_TASKS.pop(message.guild.id, None)
+                        if entry is None:
+                            await message.channel.send("❌ Nothing is currently sending.")
+                        else:
+                            entry["task"].cancel()
+                    elif rest.lower().startswith("joinall"):
                         # Make ALL bots join the user's current VC
                         if not message.author.voice or not message.author.voice.channel:
                             await message.channel.send("❌ You need to be in a voice channel first!")
