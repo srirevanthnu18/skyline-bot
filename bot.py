@@ -116,24 +116,39 @@ ALL_BOTS = []
 # --- Active DM send tasks: guild_id -> {task, count, target_name} ---
 SEND_TASKS = {}
 
-async def _resolve_member(guild, query):
+async def _resolve_user(guild, query):
+    """Returns (user_id, display_name) — works for in-server AND out-of-server users."""
     query = query.strip()
-    # Mention format <@123456>
+    uid = None
+    # Mention format <@123456> or <@!123456>
     if query.startswith("<@") and query.endswith(">"):
         uid = int(query.replace("<@", "").replace("!", "").replace(">", ""))
-        return guild.get_member(uid)
-    # Plain ID
-    if query.isdigit():
-        return guild.get_member(int(query))
-    # Name search
+    # Plain numeric ID
+    elif query.isdigit():
+        uid = int(query)
+
+    if uid is not None:
+        # Try guild cache first, then fetch from Discord (works outside server)
+        member = guild.get_member(uid)
+        if member:
+            return uid, member.display_name
+        if ALL_BOTS:
+            try:
+                user = await ALL_BOTS[0].fetch_user(uid)
+                return uid, user.name
+            except Exception:
+                pass
+        return None, None
+
+    # Name search — guild members only (can't search by name outside server)
     q = query.lower()
     for m in guild.members:
         if m.name.lower() == q or m.display_name.lower() == q:
-            return m
+            return m.id, m.display_name
     for m in guild.members:
         if q in m.name.lower() or q in m.display_name.lower():
-            return m
-    return None
+            return m.id, m.display_name
+    return None, None
 
 async def _send_loop(guild_id, target_id, message_text, status_channel):
     count = 0
@@ -142,12 +157,9 @@ async def _send_loop(guild_id, target_id, message_text, status_channel):
         while True:
             async def _dm(b):
                 try:
-                    for g in b.guilds:
-                        m = g.get_member(target_id)
-                        if m:
-                            await m.send(message_text)
-                            return True
-                    return False
+                    user = await b.fetch_user(target_id)
+                    await user.send(message_text)
+                    return True
                 except Exception:
                     return False
             results = await asyncio.gather(*[_dm(b) for b in ALL_BOTS])
@@ -255,15 +267,15 @@ def make_bot(bot_name="SKYLINE"):
         if ctx.guild.id in SEND_TASKS:
             await ctx.send("⚠️ Already sending! Use `sky stop` first.")
             return
-        member = await _resolve_member(ctx.guild, target)
-        if member is None:
-            await ctx.send(f"❌ User `{target}` not found in this server.")
+        uid, display_name = await _resolve_user(ctx.guild, target)
+        if uid is None:
+            await ctx.send(f"❌ User `{target}` not found. For out-of-server users, provide their **User ID**.")
             return
-        await ctx.send(f"🚀 All bots are now DMing **{member.display_name}** | Use `sky stop` to stop.")
+        await ctx.send(f"🚀 All bots are now DMing **{display_name}** | Use `sky stop` to stop.")
         task = asyncio.get_event_loop().create_task(
-            _send_loop(ctx.guild.id, member.id, message_text, ctx.channel)
+            _send_loop(ctx.guild.id, uid, message_text, ctx.channel)
         )
-        SEND_TASKS[ctx.guild.id] = {"task": task, "count": 0, "target": member.display_name}
+        SEND_TASKS[ctx.guild.id] = {"task": task, "count": 0, "target": display_name}
 
     @bot.command(name="stop")
     @commands.has_permissions(administrator=True)
@@ -449,15 +461,15 @@ def make_bot(bot_name="SKYLINE"):
                         if message.guild.id in SEND_TASKS:
                             await message.channel.send("⚠️ Already sending! Use `@bot /skystop` first.")
                             break
-                        member = await _resolve_member(message.guild, target_q)
-                        if member is None:
-                            await message.channel.send(f"❌ User `{target_q}` not found.")
+                        uid, display_name = await _resolve_user(message.guild, target_q)
+                        if uid is None:
+                            await message.channel.send(f"❌ User `{target_q}` not found. For out-of-server users, use their **User ID**.")
                             break
-                        await message.channel.send(f"🚀 All bots are DMing **{member.display_name}** | Say `@bot /skystop` to stop.")
+                        await message.channel.send(f"🚀 All bots are DMing **{display_name}** | Say `@bot /skystop` to stop.")
                         task = asyncio.get_event_loop().create_task(
-                            _send_loop(message.guild.id, member.id, msg_text, message.channel)
+                            _send_loop(message.guild.id, uid, msg_text, message.channel)
                         )
-                        SEND_TASKS[message.guild.id] = {"task": task, "count": 0, "target": member.display_name}
+                        SEND_TASKS[message.guild.id] = {"task": task, "count": 0, "target": display_name}
                     elif rest.lower().startswith("stop"):
                         if not message.author.guild_permissions.administrator:
                             await message.channel.send("❌ Only admins can use this command.")
